@@ -133,6 +133,13 @@ class Exchange(Enum):
     OTC = "OTC"             # OTC Product (Forex/CFD/Pink Sheet Equity)
     IBKRATS = "IBKRATS"     # Paper Trading Exchange of IB
 
+    # Crypto
+    OKX = "OKX"
+    BTSE = "BTSE"
+    BYBIT = "BYBIT"
+    BINANCE = "BINANCE"
+    DERIBIT = "DERIBIT"
+
     # Special Function
     LOCAL = "LOCAL"         # For local generated data
 
