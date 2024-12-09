@@ -29,7 +29,7 @@ class DualThrustStrategy(CtaTemplate):
     day_range = 0
     long_entry = 0
     short_entry = 0
-    exit_time = time(hour=14, minute=55)
+    # exit_time = time(hour=14, minute=55)
 
     long_entered = False
     short_entered = False
@@ -102,7 +102,7 @@ class DualThrustStrategy(CtaTemplate):
         if not self.day_range:
             return
 
-        if bar.datetime.time() < self.exit_time:
+        if True: # bar.datetime.time() < self.exit_time:
             if self.pos == 0:
                 if bar.close_price > self.day_open:
                     if not self.long_entered:
