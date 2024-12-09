@@ -291,6 +291,8 @@ class RestClient(object):
         Make relative api path into full url.
         eg: make_full_url("/get") == "http://xxxxx/get"
         """
+        if path.startswith("http"):
+            return path
         url = self.url_base + path
         return url
 

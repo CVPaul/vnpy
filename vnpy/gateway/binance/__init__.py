@@ -23,6 +23,7 @@
 from .spot import BinanceSpotGateway as Spot
 from .usdt_m import BinanceLinearGateway as USDTM
 from .coin_m import BinanceInverseGateway as CoinM
+from .coin_m import BinanceUnifyCMGateway as UnifyCM
 
 
 __version__ = "2024.12.05"

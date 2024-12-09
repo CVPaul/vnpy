@@ -5,7 +5,7 @@
 from vnpy.event import EventEngine
 from vnpy.trader.engine import MainEngine
 from vnpy.trader.ui import MainWindow, create_qapp
-from vnpy.gateway.binance import Spot, CoinM, USDTM
+from vnpy.gateway.binance import Spot, CoinM, USDTM, UnifyCM
 
 from vnpy.cta.strategy import CtaStrategyApp
 
@@ -17,6 +17,7 @@ def main():
     event_engine = EventEngine()
     main_engine = MainEngine(event_engine)
     # add gateways
+    main_engine.add_gateway(UnifyCM)
     main_engine.add_gateway(Spot)
     main_engine.add_gateway(CoinM)
     main_engine.add_gateway(USDTM)

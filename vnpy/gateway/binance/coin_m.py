@@ -1,4 +1,4 @@
-import hmac
+import os
 import time
 import urllib
 import hashlib
@@ -8,6 +8,12 @@ from enum import Enum
 from time import sleep
 from datetime import datetime, timedelta
 from numpy import format_float_positional
+
+from vnpy.gateway.binance.utils import (
+    ed25519_signature,
+    rsa_signature,
+    hmac_hashing
+)
 
 from vnpy.event import Event, EventEngine
 from vnpy.trader.constant import (
@@ -45,6 +51,11 @@ UTC_TZ = ZoneInfo("UTC")
 D_REST_HOST: str = "https://dapi.binance.com"
 D_WEBSOCKET_TRADE_HOST: str = "wss://dstream.binance.com/ws/"
 D_WEBSOCKET_DATA_HOST: str = "wss://dstream.binance.com/stream"
+
+# unify account
+P_REST_HOST: str = "https://papi.binance.com"
+P_WEBSOCKET_TRADE_HOST: str = "wss://fstream.binance.com/pm/ws/"
+P_WEBSOCKET_DATA_HOST: str = "wss://dstream.binance.com/stream"
 
 # Testnet server hosts
 D_TESTNET_REST_HOST: str = "https://testnet.binancefuture.com"
@@ -138,8 +149,12 @@ class BinanceInverseGateway(BaseGateway):
 
         self.trade_ws_api: BinanceInverseTradeWebsocketApi = BinanceInverseTradeWebsocketApi(self)
         self.market_ws_api: BinanceInverseDataWebsocketApi = BinanceInverseDataWebsocketApi(self)
-        self.rest_api: BinanceInverseRestApi = BinanceInverseRestApi(self)
-
+        if gateway_name.startswith('Unify'):
+            self.is_unify_acc = True
+            self.rest_api: BinanceUnifyCMRestApi = BinanceUnifyCMRestApi(self)
+        else:
+            self.is_unify_acc = False
+            self.rest_api: BinanceInverseRestApi = BinanceInverseRestApi(self)
         self.orders: dict[str, OrderData] = {}
 
     def connect(self, setting: dict) -> None:
@@ -218,6 +233,7 @@ class BinanceInverseRestApi(RestClient):
 
         self.key: str = ""
         self.secret: str = ""
+        self.private: str = ""
 
         self.user_stream_key: str = ""
         self.keep_alive_count: int = 0
@@ -250,11 +266,13 @@ class BinanceInverseRestApi(RestClient):
             request.params["timestamp"] = timestamp
 
             query: str = urllib.parse.urlencode(sorted(request.params.items()))
-            signature: bytes = hmac.new(
-                self.secret,
-                query.encode("utf-8"),
-                hashlib.sha256
-            ).hexdigest()
+            if self.private:
+                try:
+                    signature: bytes = ed25519_signature(self.private, query)
+                except ValueError:
+                    signature: bytes = rsa_signature(self.private, query)
+            else:
+                signature: bytes = hmac_hashing(self.secret, query)
 
             query += "&signature={}".format(signature)
             path: str = request.path + "?" + query
@@ -265,10 +283,13 @@ class BinanceInverseRestApi(RestClient):
 
         # 添加请求头
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
+            # "Content-Type": "application/x-www-form-urlencoded",
+            # "Accept": "application/json",
+            # "X-MBX-APIKEY": self.key,
+            # "Connection": "close"
+            "Content-Type": "application/json;charset=utf-8",
+            "User-Agent": "binance-connector-python/3.5.1",
             "X-MBX-APIKEY": self.key,
-            "Connection": "close"
         }
 
         if security in [Security.SIGNED, Security.API_KEY]:
@@ -286,7 +307,11 @@ class BinanceInverseRestApi(RestClient):
     ) -> None:
         """Start server connection"""
         self.key = key
-        self.secret = secret.encode()
+        if os.path.exists(secret):
+            with open(secret, 'rb') as fp:
+                self.private = fp.read()
+        else:
+            self.secret = secret.encode()
         self.proxy_port = proxy_port
         self.proxy_host = proxy_host
         self.server = server
@@ -1042,3 +1067,569 @@ def format_float(f: float) -> str:
     Fix potential error -1111: Parameter 'quantity' has too much precision
     """
     return format_float_positional(f, trim='-')
+
+
+# ======================统一账户======================
+
+
+class BinanceUnifyCMRestApi(RestClient):
+    """The REST API of BinanceInverseGateway"""
+
+    def __init__(self, gateway: BinanceInverseGateway) -> None:
+        """
+        The init method of the api.
+
+        gateway: the parent gateway object for pushing callback data.
+        """
+        super().__init__()
+
+        self.gateway: BinanceInverseGateway = gateway
+        self.gateway_name: str = gateway.gateway_name
+
+        self.trade_ws_api: BinanceInverseTradeWebsocketApi = self.gateway.trade_ws_api
+
+        self.key: str = ""
+        self.secret: str = ""
+        self.private: str = ""
+
+        self.user_stream_key: str = ""
+        self.keep_alive_count: int = 0
+        self.time_offset: int = 0
+
+        self.order_count: int = 1_000_000
+        self.order_prefix: str = ""
+
+    def sign(self, request: Request) -> Request:
+        """Standard callback for signing a request"""
+        security: Security = request.data["security"]
+        if security == Security.NONE:
+            request.data = None
+            return request
+
+        if request.params:
+            path: str = request.path + "?" + urllib.parse.urlencode(request.params)
+        else:
+            request.params = dict()
+            path: str = request.path
+
+        if security == Security.SIGNED:
+            timestamp: int = int(time.time() * 1000)
+
+            if self.time_offset > 0:
+                timestamp -= abs(self.time_offset)
+            elif self.time_offset < 0:
+                timestamp += abs(self.time_offset)
+
+            request.params["timestamp"] = timestamp
+
+            query: str = urllib.parse.urlencode(sorted(request.params.items()))
+            if self.private:
+                try:
+                    signature: bytes = ed25519_signature(self.private, query)
+                except ValueError:
+                    signature: bytes = rsa_signature(self.private, query)
+            else:
+                signature: bytes = hmac_hashing(self.secret, query)
+
+            query += "&" + urllib.parse.urlencode({"signature": signature}, True).replace("%40", "@")
+            path: str = request.path + "?" + query
+
+        request.path = path
+        request.params = {}
+        request.data = {}
+
+        # 添加请求头
+        headers = {
+            # "Content-Type": "application/x-www-form-urlencoded",
+            # "Accept": "application/json",
+            # "X-MBX-APIKEY": self.key,
+            # "Connection": "close"
+            "Content-Type": "application/json;charset=utf-8",
+            "User-Agent": "binance-connector-python/3.5.1",
+            "X-MBX-APIKEY": self.key,
+        }
+
+        if security in [Security.SIGNED, Security.API_KEY]:
+            request.headers = headers
+
+        return request
+
+    def connect(
+        self,
+        key: str,
+        secret: str,
+        server: str,
+        proxy_host: str,
+        proxy_port: int
+    ) -> None:
+        """Start server connection"""
+        self.key = key
+        if os.path.exists(secret):
+            with open(secret, 'r') as fp:
+                self.private = fp.read().strip()
+        else:
+            self.secret = secret.encode()
+        self.proxy_port = proxy_port
+        self.proxy_host = proxy_host
+        self.server = server
+
+        self.order_prefix = datetime.now().strftime("%y%m%d%H%M%S")
+
+        if self.server == "REAL":
+            self.init(P_REST_HOST, proxy_host, proxy_port)
+        else:
+            self.init(D_TESTNET_REST_HOST, proxy_host, proxy_port)
+
+        self.start()
+
+        self.gateway.write_log("REST API started")
+
+        self.query_time()
+        self.query_contract()
+
+    def query_time(self) -> None:
+        """Query server time"""
+        data: dict = {"security": Security.NONE}
+
+        path: str = "/papi/v1/time"
+
+        return self.add_request(
+            "GET",
+            path,
+            callback=self.on_query_time,
+            data=data
+        )
+
+    def query_account(self) -> None:
+        """Query account balance"""
+        data: dict = {"security": Security.SIGNED}
+
+        path: str = "/papi/v1/account"
+
+        self.add_request(
+            method="GET",
+            path=path,
+            callback=self.on_query_account,
+            data=data
+        )
+
+    def query_position(self) -> None:
+        """Query holding positions"""
+        data: dict = {"security": Security.SIGNED}
+
+        path: str = "/papi/v1/cm/positionRisk"
+
+        self.add_request(
+            method="GET",
+            path=path,
+            callback=self.on_query_position,
+            data=data
+        )
+
+    def query_order(self) -> None:
+        """Query open orders"""
+        data: dict = {"security": Security.SIGNED}
+
+        path: str = "/papi/v1/cm/openOrders"
+
+        self.add_request(
+            method="GET",
+            path=path,
+            callback=self.on_query_order,
+            data=data
+        )
+
+    def query_contract(self) -> None:
+        """Query available contracts"""
+        data: dict = {"security": Security.NONE}
+
+        path: str = D_REST_HOST + "/dapi/v1/exchangeInfo"
+
+        self.add_request(
+            method="GET",
+            path=path,
+            callback=self.on_query_contract,
+            data=data
+        )
+
+    def send_order(self, req: OrderRequest) -> str:
+        """Send new order"""
+        # Generate new order id
+        self.order_count += 1
+        orderid: str = self.order_prefix + str(self.order_count)
+
+        # Push a submitting order event
+        order: OrderData = req.create_order_data(
+            orderid,
+            self.gateway_name
+        )
+        self.gateway.on_order(order)
+
+        # Create order parameters
+        data: dict = {"security": Security.SIGNED}
+
+        params: dict = {
+            "symbol": req.symbol,
+            "side": DIRECTION_VT2BINANCES[req.direction],
+            "quantity": format_float(req.volume),
+            "newClientOrderId": orderid,
+        }
+
+        if req.type == OrderType.MARKET:
+            params["type"] = "MARKET"
+        elif req.type == OrderType.STOP:
+            params["type"] = "STOP_MARKET"
+            params["stopPrice"] = format_float(req.price)
+        else:
+            order_type, time_condition = ORDERTYPE_VT2BINANCES[req.type]
+            params["type"] = order_type
+            params["timeInForce"] = time_condition
+            params["price"] = format_float(req.price)
+
+        path: str = "/papi/v1/cm/order"
+
+        self.add_request(
+            method="POST",
+            path=path,
+            callback=self.on_send_order,
+            data=data,
+            params=params,
+            extra=order,
+            on_error=self.on_send_order_error,
+            on_failed=self.on_send_order_failed
+        )
+
+        return order.vt_orderid
+
+    def cancel_order(self, req: CancelRequest) -> None:
+        """Cancel existing order"""
+        data: dict = {"security": Security.SIGNED}
+
+        params: dict = {
+            "symbol": req.symbol,
+            "origClientOrderId": req.orderid
+        }
+
+        path: str = "/papi/v1/cm/order"
+
+        order: OrderData = self.gateway.get_order(req.orderid)
+
+        self.add_request(
+            method="DELETE",
+            path=path,
+            callback=self.on_cancel_order,
+            params=params,
+            data=data,
+            on_failed=self.on_cancel_failed,
+            extra=order
+        )
+
+    def start_user_stream(self) -> Request:
+        """Create listen key for user stream"""
+        data: dict = {
+            "security": Security.API_KEY
+        }
+
+        path: str = "/papi/v1/listenKey"
+
+        self.add_request(
+            method="POST",
+            path=path,
+            callback=self.on_start_user_stream,
+            data=data
+        )
+
+    def keep_user_stream(self) -> Request:
+        """Extend listen key validity"""
+        if not self.user_stream_key:
+            return
+
+        self.keep_alive_count += 1
+        if self.keep_alive_count < 600:
+            return
+        self.keep_alive_count = 0
+
+        data: dict = {"security": Security.API_KEY}
+
+        params: dict = {"listenKey": self.user_stream_key}
+
+        path: str = "/papi/v1/listenKey"
+
+        self.add_request(
+            method="PUT",
+            path=path,
+            callback=self.on_keep_user_stream,
+            params=params,
+            data=data,
+            on_error=self.on_keep_user_stream_error
+        )
+
+    def on_query_time(self, data: dict, request: Request) -> None:
+        """Callback of server time query"""
+        local_time: int = int(time.time() * 1000)
+        server_time: int = int(data["serverTime"])
+        self.time_offset: int = local_time - server_time
+
+        self.gateway.write_log(f"Server time updated, local offset: {self.time_offset}ms")
+
+        # Query private data after time offset is calculated
+        if self.key and (self.secret or self.private):
+            self.query_account()
+            self.query_position()
+            self.query_order()
+            self.start_user_stream()
+
+    def on_query_account(self, data: dict, request: Request) -> None:
+        """Callback of account balance query"""
+        account: AccountData = AccountData(
+            accountid='UnifyCM',
+            balance=float(data["actualEquity"]),
+            frozen=float(data["accountMaintMargin"]),
+            gateway_name=self.gateway_name
+        )
+
+        if account.balance:
+            self.gateway.on_account(account)
+
+        self.gateway.write_log("Account balance data is received")
+
+    def on_query_position(self, data: dict, request: Request) -> None:
+        """Callback of holding positions query"""
+        for d in data:
+            position: PositionData = PositionData(
+                symbol=d["symbol"],
+                exchange=Exchange.BINANCE,
+                direction=Direction.NET,
+                volume=float(d["positionAmt"]),
+                price=float(d["entryPrice"]),
+                pnl=float(d["unRealizedProfit"]),
+                gateway_name=self.gateway_name,
+            )
+
+            if position.volume:
+                volume = d["positionAmt"]
+                if '.' in volume:
+                    position.volume = float(d["positionAmt"])
+                else:
+                    position.volume = int(d["positionAmt"])
+
+                self.gateway.on_position(position)
+
+        self.gateway.write_log("Holding positions data is received")
+
+    def on_query_order(self, data: dict, request: Request) -> None:
+        """Callback of open orders query"""
+        for d in data:
+            key: tuple[str, str] = (d["type"], d["timeInForce"])
+            order_type: OrderType = ORDERTYPE_BINANCES2VT.get(key, None)
+            if not order_type:
+                continue
+
+            order: OrderData = OrderData(
+                orderid=d["clientOrderId"],
+                symbol=d["symbol"],
+                exchange=Exchange.BINANCE,
+                price=float(d["price"]),
+                volume=float(d["origQty"]),
+                type=order_type,
+                direction=DIRECTION_BINANCES2VT[d["side"]],
+                traded=float(d["executedQty"]),
+                status=STATUS_BINANCES2VT.get(d["status"], None),
+                datetime=generate_datetime(d["time"]),
+                gateway_name=self.gateway_name,
+            )
+            self.gateway.on_order(order)
+
+        self.gateway.write_log("Open orders data is received")
+
+    def on_query_contract(self, data: dict, request: Request) -> None:
+        """Callback of available contracts query"""
+        for d in data["symbols"]:
+            base_currency: str = d["baseAsset"]
+            quote_currency: str = d["quoteAsset"]
+            name: str = f"{base_currency.upper()}/{quote_currency.upper()}"
+
+            pricetick: int = 1
+            min_volume: int = 1
+
+            for f in d["filters"]:
+                if f["filterType"] == "PRICE_FILTER":
+                    pricetick = float(f["tickSize"])
+                elif f["filterType"] == "LOT_SIZE":
+                    min_volume = float(f["stepSize"])
+
+            contract: ContractData = ContractData(
+                symbol=d["symbol"],
+                exchange=Exchange.BINANCE,
+                name=name,
+                pricetick=pricetick,
+                size=d["contractSize"],
+                min_volume=min_volume,
+                product=Product.FUTURES,
+                net_position=True,
+                history_data=True,
+                gateway_name=self.gateway_name,
+                stop_supported=True
+            )
+            self.gateway.on_contract(contract)
+
+            symbol_contract_map[contract.symbol] = contract
+
+        self.gateway.write_log("Available contracts data is received")
+
+    def on_send_order(self, data: dict, request: Request) -> None:
+        """Successful callback of send_order"""
+        pass
+
+    def on_send_order_failed(self, status_code: str, request: Request) -> None:
+        """Failed callback of send_order"""
+        order: OrderData = request.extra
+        order.status = Status.REJECTED
+        self.gateway.on_order(order)
+
+        msg: str = f"Send order failed, status code: {status_code}, message: {request.response.text}"
+        self.gateway.write_log(msg)
+
+    def on_send_order_error(self, exception_type: type, exception_value: Exception, tb, request: Request) -> None:
+        """Error callback of send_order"""
+        order: OrderData = request.extra
+        order.status = Status.REJECTED
+        self.gateway.on_order(order)
+
+        if not issubclass(exception_type, ConnectionError):
+            self.on_error(exception_type, exception_value, tb, request)
+
+    def on_cancel_order(self, data: dict, request: Request) -> None:
+        """Successful callback of cancel_order"""
+        pass
+
+    def on_cancel_failed(self, status_code: str, request: Request) -> None:
+        """Failed callback of cancel_order"""
+        if request.extra:
+            order = request.extra
+            order.status = Status.REJECTED
+            self.gateway.on_order(order)
+
+        msg: str = f"Cancel orde failed, status code: {status_code}, message: {request.response.text}, order: {request.extra} "
+        self.gateway.write_log(msg)
+
+    def on_start_user_stream(self, data: dict, request: Request) -> None:
+        """Successful callback of start_user_stream"""
+        self.user_stream_key = data["listenKey"]
+        self.keep_alive_count = 0
+
+        if self.server == "REAL":
+            url = P_WEBSOCKET_TRADE_HOST + self.user_stream_key
+        else:
+            url = D_TESTNET_WEBSOCKET_TRADE_HOST + self.user_stream_key
+
+        self.trade_ws_api.connect(url, self.proxy_host, self.proxy_port)
+
+    def on_keep_user_stream(self, data: dict, request: Request) -> None:
+        """Successful callback of keep_user_stream"""
+        pass
+
+    def on_keep_user_stream_error(self, exception_type: type, exception_value: Exception, tb, request: Request) -> None:
+        """Error callback of keep_user_stream"""
+        if not issubclass(exception_type, TimeoutError):        # Ignore timeout exception
+            self.on_error(exception_type, exception_value, tb, request)
+
+    def query_history(self, req: HistoryRequest) -> list[BarData]:
+        """Query kline history data"""
+        history: list[BarData] = []
+        limit: int = 1500
+
+        end_time: int = int(datetime.timestamp(req.end))
+
+        while True:
+            # Create query parameters
+            params: dict = {
+                "symbol": req.symbol,
+                "interval": INTERVAL_VT2BINANCES[req.interval],
+                "limit": limit
+            }
+
+            params["endTime"] = end_time * 1000
+            path: str = D_REST_HOST + "/dapi/v1/klines"
+            if req.start:
+                start_time = int(datetime.timestamp(req.start))
+                params["startTime"] = start_time * 1000     # Convert to milliseconds
+
+            resp: Response = self.request(
+                "GET",
+                path=path,
+                data={"security": Security.NONE},
+                params=params
+            )
+
+            # Break the loop if request failed
+            if resp.status_code // 100 != 2:
+                msg: str = f"Query kline history failed, status code: {resp.status_code}, message: {resp.text}"
+                self.gateway.write_log(msg)
+                break
+            else:
+                data: dict = resp.json()
+                if not data:
+                    msg: str = f"No kline history data is received, start time: {start_time}"
+                    self.gateway.write_log(msg)
+                    break
+
+                buf: list[BarData] = []
+
+                for row in data:
+                    bar: BarData = BarData(
+                        symbol=req.symbol,
+                        exchange=req.exchange,
+                        datetime=generate_datetime(row[0]),
+                        interval=req.interval,
+                        volume=float(row[5]),
+                        turnover=float(row[7]),
+                        open_price=float(row[1]),
+                        high_price=float(row[2]),
+                        low_price=float(row[3]),
+                        close_price=float(row[4]),
+                        gateway_name=self.gateway_name
+                    )
+                    bar.extra = {
+                        "trade_count": int(row[8]),
+                        "active_volume": float(row[9]),
+                        "active_turnover": float(row[10]),
+                    }
+                    buf.append(bar)
+
+                begin: datetime = buf[0].datetime
+                end: datetime = buf[-1].datetime
+
+                buf = list(reversed(buf))
+                history.extend(buf)
+                msg: str = f"Query kline history finished, {req.symbol} - {req.interval.value}, {begin} - {end}"
+                self.gateway.write_log(msg)
+
+                # Break the loop if the latest data received
+                if (
+                    len(data) < limit
+                    or (req.end and end >= req.end)
+                ):
+                    break
+
+                # Update query start time
+                end_dt = begin - TIMEDELTA_MAP[req.interval]
+                end_time = int(datetime.timestamp(end_dt))
+
+            # Wait to meet request flow limit
+            sleep(0.5)
+
+        # Reverse the entire list
+        history = list(reversed(history))
+
+        # Remove the unclosed kline
+        if history:
+            history.pop(-1)
+
+        return history
+
+
+class BinanceUnifyCMGateway(BinanceInverseGateway):
+    """Compatibility interface for the Unify Margin BinanceUnifyCMGateway"""
+
+    default_name: str = "UnifyCM"
