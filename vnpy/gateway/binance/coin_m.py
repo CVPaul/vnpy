@@ -681,7 +681,7 @@ class BinanceInverseRestApi(RestClient):
     def query_history(self, req: HistoryRequest) -> list[BarData]:
         """Query kline history data"""
         history: list[BarData] = []
-        limit: int = 1500
+        limit: int = 100
 
         end_time: int = int(datetime.timestamp(req.end))
 
@@ -689,7 +689,7 @@ class BinanceInverseRestApi(RestClient):
             # Create query parameters
             params: dict = {
                 "symbol": req.symbol,
-                "interval": INTERVAL_VT2BINANCES[req.interval],
+                "interval": INTERVAL_VT2BINANCES.get(req.interval, req.interval),
                 "limit": limit
             }
 
