@@ -67,13 +67,8 @@ class CtaManager(QtWidgets.QWidget):
         roll_button: QtWidgets.QPushButton = QtWidgets.QPushButton(_("移仓助手"))
         roll_button.clicked.connect(self.roll)
 
-<<<<<<< HEAD
         exit_button: QtWidgets.QPushButton = QtWidgets.QPushButton(_("退出"))
         exit_button.clicked.connect(self.close)
-=======
-        exit_button: QtWidgets.QPushButton = QtWidgets.QPushButton(_("移仓助手"))
-        exit_button.clicked.connect(self.roll)
->>>>>>> d9331a7b (add t0 startegy)
 
         self.scroll_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout()
         self.scroll_layout.addStretch()
