@@ -47,6 +47,7 @@ class T0Strategy(CtaTemplate):
         self.threshold = 0.5
         self.last_trade = None
         self.last_trade_time = 0
+        self.last_order_time = 0
     
     # def on_init_am(self, bar: BarData):
     #     self.am.update_bar(bar)
@@ -83,10 +84,10 @@ class T0Strategy(CtaTemplate):
         self.bg.update_tick(tick)
         # if self.hm.inited and self.am.inited:
         #     return
-        if tick.localtime.timestamp() - self.last_trade_time < 100: # 10s
-            self.last_trade_time = tick.localtime.timestamp()
+        if tick.localtime.timestamp() - self.last_trade_time < 10: # 10s
             return
-        if self.last_trade and abs(tick.last_price / self.last_trade.price - 1.0) < 0.01:
+        self.last_trade_time = tick.localtime.timestamp()
+        if self.last_trade and abs(tick.last_price / self.last_trade.price - 1.0) < 0.005:
             return
         self.cancel_all()
         if abs(self.pos) > self.maxpos:
