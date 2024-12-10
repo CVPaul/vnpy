@@ -2,12 +2,14 @@
 #-*- coding:utf-8 -*-
 
 
+from vnpy.cta.backtest.engine import BacktesterEngine
 from vnpy.event import EventEngine
 from vnpy.trader.engine import MainEngine
 from vnpy.trader.ui import MainWindow, create_qapp
 from vnpy.gateway.binance import Spot, CoinM, USDTM, UnifyCM
 
 from vnpy.cta.strategy import CtaStrategyApp
+from vnpy.cta.backtest import CtaBacktesterApp
 from vnpy.data.recorder import DataRecorderApp
 from vnpy.portfolio import PortfolioStrategyApp
 
@@ -26,6 +28,7 @@ def main():
     # add applications
     main_engine.add_app(CtaStrategyApp)
     main_engine.add_app(DataRecorderApp)
+    main_engine.add_app(BacktesterEngine)
     main_engine.add_app(PortfolioStrategyApp)
     # main window setting
     main_window = MainWindow(main_engine, event_engine)
