@@ -106,27 +106,27 @@ class DualThrustStrategy(CtaTemplate):
             if self.pos == 0:
                 if bar.close_price > self.day_open:
                     if not self.long_entered:
-                        self.buy(self.long_entry, self.fixed_size, stop=False)
+                        self.buy(self.long_entry, self.fixed_size, stop=True)
                 else:
                     if not self.short_entered:
                         self.short(self.short_entry,
-                                   self.fixed_size, stop=False)
+                                   self.fixed_size, stop=True)
 
             elif self.pos > 0:
                 self.long_entered = True
 
-                self.sell(self.short_entry, self.fixed_size, stop=False)
+                self.sell(self.short_entry, self.fixed_size, stop=True)
 
                 if not self.short_entered:
-                    self.short(self.short_entry, self.fixed_size, stop=False)
+                    self.short(self.short_entry, self.fixed_size, stop=True)
 
             elif self.pos < 0:
                 self.short_entered = True
 
-                self.cover(self.long_entry, self.fixed_size, stop=False)
+                self.cover(self.long_entry, self.fixed_size, stop=True)
 
                 if not self.long_entered:
-                    self.buy(self.long_entry, self.fixed_size, stop=False)
+                    self.buy(self.long_entry, self.fixed_size, stop=True)
 
         else:
             if self.pos > 0:
