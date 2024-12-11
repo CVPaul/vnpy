@@ -832,7 +832,7 @@ class BinanceSpotDataWebsocketApi(WebsocketClient):
             channels = []
             for symbol in self.ticks.keys():
                 channels.append(f"{symbol}@ticker")
-                channels.append(f"{symbol}@depth10")
+                channels.append(f"{symbol}@depth20")
 
                 if self.kline_stream:
                     channels.append(f"{symbol}@kline_1m")
@@ -868,7 +868,7 @@ class BinanceSpotDataWebsocketApi(WebsocketClient):
 
         channels = [
             f"{req.symbol}@ticker",
-            f"{req.symbol}@depth10"
+            f"{req.symbol}@depth20"
         ]
 
         if self.kline_stream:
@@ -901,7 +901,7 @@ class BinanceSpotDataWebsocketApi(WebsocketClient):
             tick.low_price = float(data['l'])
             tick.last_price = float(data['c'])
             tick.datetime = generate_datetime(float(data['E']))
-        elif channel == "depth10":
+        elif channel == "depth20":
             bids: list = data["bids"]
             for n in range(min(10, len(bids))):
                 price, volume = bids[n]

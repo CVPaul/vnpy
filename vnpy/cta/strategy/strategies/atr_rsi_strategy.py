@@ -115,7 +115,7 @@ class AtrRsiStrategy(CtaTemplate):
 
             long_stop = self.intra_trade_high * \
                 (1 - self.trailing_percent / 100)
-            self.sell(long_stop, abs(self.pos), stop=True)
+            self.sell(long_stop, abs(self.pos), stop=False)
 
         elif self.pos < 0:
             self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
@@ -123,7 +123,7 @@ class AtrRsiStrategy(CtaTemplate):
 
             short_stop = self.intra_trade_low * \
                 (1 + self.trailing_percent / 100)
-            self.cover(short_stop, abs(self.pos), stop=True)
+            self.cover(short_stop, abs(self.pos), stop=False)
 
         self.put_event()
 

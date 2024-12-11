@@ -28,7 +28,7 @@ def main():
     # add applications
     main_engine.add_app(CtaStrategyApp)
     main_engine.add_app(DataRecorderApp)
-    main_engine.add_app(BacktesterEngine)
+    main_engine.add_app(CtaBacktesterApp)
     main_engine.add_app(PortfolioStrategyApp)
     # main window setting
     main_window = MainWindow(main_engine, event_engine)

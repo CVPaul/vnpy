@@ -940,7 +940,7 @@ class BinanceInverseDataWebsocketApi(WebsocketClient):
             channels = []
             for symbol in self.ticks.keys():
                 channels.append(f"{symbol}@ticker")
-                channels.append(f"{symbol}@depth10")
+                channels.append(f"{symbol}@depth20")
 
                 if self.kline_stream:
                     channels.append(f"{symbol}@kline_1m")
@@ -976,7 +976,7 @@ class BinanceInverseDataWebsocketApi(WebsocketClient):
 
         channels = [
             f"{req.symbol.lower()}@ticker",
-            f"{req.symbol.lower()}@depth10"
+            f"{req.symbol.lower()}@depth20"
         ]
 
         if self.kline_stream:
@@ -1009,7 +1009,7 @@ class BinanceInverseDataWebsocketApi(WebsocketClient):
             tick.low_price = float(data['l'])
             tick.last_price = float(data['c'])
             tick.datetime = generate_datetime(float(data['E']))
-        elif channel == "depth10":
+        elif channel == "depth20":
             bids: list = data["b"]
             for n in range(min(10, len(bids))):
                 price, volume = bids[n]

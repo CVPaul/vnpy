@@ -3,6 +3,8 @@
 *.pyo
 *.pyd
 *.txt
+*.pid
+*.PID
 *.egg-info/
 
 # Jupyter
