@@ -28,7 +28,7 @@ class TakePinStrategy(CtaTemplate):
         # "his_window",
         "volume",
         "ratio",
-        "hpp"
+        "hpp",
     ]
 
     variables = [
@@ -44,7 +44,6 @@ class TakePinStrategy(CtaTemplate):
         # self.bg = BarGenerator(self.on_bar)
         # self.am = ArrayManager(self.atr_window)
         # self.hm = ArrayManager(self.his_window)
-        self.hpp = 0.0
         self.stopped = False
         self.last_trade = None
         self.last_trade_time = 0
@@ -77,10 +76,9 @@ class TakePinStrategy(CtaTemplate):
         # self.bg.update_tick(tick)
         # if self.hm.inited and self.am.inited:
         #     return
+        self.hpp = max(self.hpp, tick.last_price)
         if self.stopped:
             return
-        if self.hpp <= 0:
-            self.hpp = tick.last_price
         if tick.datetime.timestamp() - self.last_order_time < 10: # 10s
             return
         self.cancel_all()
