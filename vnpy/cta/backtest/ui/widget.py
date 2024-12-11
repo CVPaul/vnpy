@@ -17,7 +17,7 @@ from vnpy.chart import ChartWidget, CandleItem, VolumeItem
 from vnpy.trader.utility import load_json, save_json
 from vnpy.trader.object import BarData, TradeData, OrderData
 from vnpy.trader.database import DB_TZ
-from vnpy_ctastrategy.backtesting import DailyResult
+from vnpy.cta.strategy.backtesting import DailyResult
 
 from ..locale import _
 from ..engine import (
