@@ -13,12 +13,13 @@ from vnpy.cta.strategy import (
 )
 
 
-class TakePinStrategy(CtaTemplate):
+class TakeFlashPinStrategy(CtaTemplate):
     """"""
 
     author = "T0"
 
     volume = 1
+    period = 30
     ratio = 0.1
     hpp = 0.0
 
@@ -27,6 +28,7 @@ class TakePinStrategy(CtaTemplate):
         # "atr_window",
         # "his_window",
         "volume",
+        "period",
         "ratio",
         "hpp",
     ]
@@ -41,13 +43,11 @@ class TakePinStrategy(CtaTemplate):
         """"""
         super().__init__(cta_engine, strategy_name, vt_symbol, setting)
 
-        # self.bg = BarGenerator(self.on_bar)
-        # self.am = ArrayManager(self.atr_window)
-        # self.hm = ArrayManager(self.his_window)
         self.stopped = False
-        self.last_trade = None
-        self.last_trade_time = 0
         self.last_order_time = 0
+
+        self.bg = BarGenerator(self.on_bar)
+        self.am = ArrayManager(self.period)
     
     def on_init(self):
         """
@@ -92,6 +92,12 @@ class TakePinStrategy(CtaTemplate):
         """
         Callback of new bar data update.
         """
+        am = self.am
+        am.update_bar(bar)
+        if not am.inited:
+            return
+        self.hpp = am.high[-1]
+        self.put_event()
 
     def on_order(self, order: OrderData):
         """
