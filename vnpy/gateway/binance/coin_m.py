@@ -283,13 +283,10 @@ class BinanceInverseRestApi(RestClient):
 
         # 添加请求头
         headers = {
-            # "Content-Type": "application/x-www-form-urlencoded",
-            # "Accept": "application/json",
-            # "X-MBX-APIKEY": self.key,
-            # "Connection": "close"
-            "Content-Type": "application/json;charset=utf-8",
-            "User-Agent": "binance-connector-python/3.5.1",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
             "X-MBX-APIKEY": self.key,
+            "Connection": "close"
         }
 
         if security in [Security.SIGNED, Security.API_KEY]:
@@ -1140,13 +1137,10 @@ class BinanceUnifyCMRestApi(RestClient):
 
         # 添加请求头
         headers = {
-            # "Content-Type": "application/x-www-form-urlencoded",
-            # "Accept": "application/json",
-            # "X-MBX-APIKEY": self.key,
-            # "Connection": "close"
-            "Content-Type": "application/json;charset=utf-8",
-            "User-Agent": "binance-connector-python/3.5.1",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
             "X-MBX-APIKEY": self.key,
+            "Connection": "close"
         }
 
         if security in [Security.SIGNED, Security.API_KEY]:
