@@ -494,6 +494,10 @@ class SettingEditor(QtWidgets.QDialog):
         button.clicked.connect(self.accept)
         form.addRow(button)
 
+        button1: QtWidgets.QPushButton = QtWidgets.QPushButton(_("退出"))
+        button1.clicked.connect(self.close)
+        form.addRow(button1)
+
         widget: QtWidgets.QWidget = QtWidgets.QWidget()
         widget.setLayout(form)
 
@@ -526,4 +530,4 @@ class SettingEditor(QtWidgets.QDialog):
 
             setting[name] = value
 
-        return setting
+        return setting 
