@@ -56,24 +56,44 @@ class TickData(BaseData):
     bid_price_3: float = 0
     bid_price_4: float = 0
     bid_price_5: float = 0
+    bid_price_6: float = 0
+    bid_price_7: float = 0
+    bid_price_8: float = 0
+    bid_price_9: float = 0
+    bid_price_10: float = 0
 
     ask_price_1: float = 0
     ask_price_2: float = 0
     ask_price_3: float = 0
     ask_price_4: float = 0
     ask_price_5: float = 0
+    ask_price_6: float = 0
+    ask_price_7: float = 0
+    ask_price_8: float = 0
+    ask_price_9: float = 0
+    ask_price_10: float = 0
 
     bid_volume_1: float = 0
     bid_volume_2: float = 0
     bid_volume_3: float = 0
     bid_volume_4: float = 0
     bid_volume_5: float = 0
+    bid_volume_6: float = 0
+    bid_volume_7: float = 0
+    bid_volume_8: float = 0
+    bid_volume_9: float = 0
+    bid_volume_10: float = 0
 
     ask_volume_1: float = 0
     ask_volume_2: float = 0
     ask_volume_3: float = 0
     ask_volume_4: float = 0
     ask_volume_5: float = 0
+    ask_volume_6: float = 0
+    ask_volume_7: float = 0
+    ask_volume_8: float = 0
+    ask_volume_9: float = 0
+    ask_volume_10: float = 0
 
     localtime: datetime = None
 
