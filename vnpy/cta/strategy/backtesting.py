@@ -829,7 +829,8 @@ class BacktestingEngine:
         volume: float,
         stop: bool,
         lock: bool,
-        net: bool
+        net: bool,
+        market: bool = False
     ) -> list:
         """"""
         price: float = round_to(price, self.pricetick)
