@@ -183,8 +183,8 @@ class BacktestingEngine:
         progress = 0
 
         while start < self.end:
-            progress_bar: str = "#" * int(progress * 10 + 1)
-            self.output(_("加载进度：{} [{:.0%}]").format(progress_bar, progress))
+            #progress_bar: str = "#" * int(progress * 10 + 1)
+            #self.output(_("加载进度：{} [{:.0%}]").format(progress_bar, progress))
 
             end: datetime = min(end, self.end)  # Make sure end time stays within set range
 
@@ -223,11 +223,11 @@ class BacktestingEngine:
 
         self.strategy.on_init()
         self.strategy.inited = True
-        self.output(_("策略初始化完成"))
+        # self.output(_("策略初始化完成"))
 
         self.strategy.on_start()
         self.strategy.trading = True
-        self.output(_("开始回放历史数据"))
+        # self.output(_("开始回放历史数据"))
 
         total_size: int = len(self.history_data)
         batch_size: int = max(int(total_size / 10), 1)
@@ -243,15 +243,15 @@ class BacktestingEngine:
                     return
 
             progress = min(ix / 10, 1)
-            progress_bar: str = "=" * (ix + 1)
-            self.output(_("回放进度：{} [{:.0%}]").format(progress_bar, progress))
+            #progress_bar: str = "=" * (ix + 1)
+            #self.output(_("回放进度：{} [{:.0%}]").format(progress_bar, progress))
 
         self.strategy.on_stop()
-        self.output(_("历史数据回放结束"))
+        # self.output(_("历史数据回放结束"))
 
     def calculate_result(self) -> DataFrame:
         """"""
-        self.output(_("开始计算逐日盯市盈亏"))
+        # self.output(_("开始计算逐日盯市盈亏"))
 
         if not self.trades:
             self.output(_("回测成交记录为空"))
@@ -287,12 +287,12 @@ class BacktestingEngine:
 
         self.daily_df = DataFrame.from_dict(results).set_index("date")
 
-        self.output(_("逐日盯市盈亏计算完成"))
+        # self.output(_("逐日盯市盈亏计算完成"))
         return self.daily_df
 
     def calculate_statistics(self, df: DataFrame = None, output=True) -> dict:
         """"""
-        self.output(_("开始计算策略统计指标"))
+        # self.output(_("开始计算策略统计指标"))
 
         # Check DataFrame input exterior
         if df is None:
@@ -397,7 +397,7 @@ class BacktestingEngine:
                 ewm_window: ExponentialMovingWindow = df["return"].ewm(halflife=self.half_life)
                 ewm_mean: Series = ewm_window.mean() * 100
                 ewm_std: Series = ewm_window.std() * 100
-                ewm_sharpe: float = ((ewm_mean - daily_risk_free) / ewm_std)[-1] * np.sqrt(self.annual_days)
+                ewm_sharpe: float = ((ewm_mean - daily_risk_free) / ewm_std).iloc[-1] * np.sqrt(self.annual_days)
             else:
                 sharpe_ratio: float = 0
                 ewm_sharpe: float = 0
@@ -480,7 +480,7 @@ class BacktestingEngine:
                 value = 0
             statistics[key] = np.nan_to_num(value)
 
-        self.output(_("策略统计指标计算完成"))
+        # self.output(_("策略统计指标计算完成"))
         return statistics
 
     # def show_chart(self, df: DataFrame = None) -> None:

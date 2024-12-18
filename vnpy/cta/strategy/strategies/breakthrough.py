@@ -32,7 +32,6 @@ class BreakStrategy(CtaTemplate):
         "atr_window",
         "his_window",
         "volume",
-        "period",
         "k1",
         "s1",
         "s2",
@@ -44,7 +43,6 @@ class BreakStrategy(CtaTemplate):
         "dnn",
         "atr",
         "ma",
-        "range"
     ]
 
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
@@ -53,14 +51,13 @@ class BreakStrategy(CtaTemplate):
 
         self.stopped = False
         self.last_order_time = 0
+        self.atr = 0.0
         self.upp = 0.0
         self.dnn = 0.0
         self.ma = 0.0
-        self.range = 0.0
         self.hpp = 0.0
         self.lpp = 0.0
         self.enpp = 0.0
-        self.mp = 0
 
         self.bg = BarGenerator(self.on_bar, 8, self.on_8h_bar, Interval.HOUR)
         self.am_8h = ArrayManager(self.atr_window + 1)
@@ -104,21 +101,31 @@ class BreakStrategy(CtaTemplate):
         if self.mp == 0:
             if tick.ask_price_1 >= self.ma + self.atr * self.k1:
                 self.buy(tick.ask_price_1, self.volume)
+                # print('buy', self.atr, tick.ask_price_1, self.volume)
                 self.mp = 1
             elif tick.bid_price_1 <= self.ma - self.atr * self.k1:
                 self.short(tick.bid_price_1, self.volume)
+                # print('short', self.atr, self.k1, self.s1, tick.bid_price_1, self.volume)
                 self.mp = -1
         elif self.mp > 0:
             # if tick.bid_price_1 <= self.enpp - self.atr * self.s2: # loss
             #     self.sell(tick.bid_price_1, self.mp)
-            if tick.bid_price_1 <= self.hpp - self.atr * self.s1: # may loss
-                self.sell(tick.bid_price_1, self.mp)
+            if tick.ask_price_1 >= self.enpp + self.atr * self.s1: # take profit
+                self.sell(tick.ask_price_1, self.volume)
+                # print('sell-profit', tick.ask_price_1, self.volume)
+                self.mp = 0
+            if tick.bid_price_1 <= self.enpp - self.atr * self.s2: # loss
+                self.sell(tick.bid_price_1, self.volume)
                 self.mp = 0
         else:
             # if tick.ask_price_1 >= self.enpp + self.atr * self.s2: # loss
             #     self.cover(tick.bid_price_1, self.mp)
-            if tick.ask_price_1 >= self.lpp + self.atr * self.s1: # may loss
-                self.cover(tick.bid_price_1, self.mp)
+            if tick.bid_price_1 <= self.enpp - self.atr * self.s1: # profit
+                self.cover(tick.bid_price_1, self.volume)
+                # print('cover-profit', tick.bid_price_1, self.volume)
+                self.mp = 0
+            if tick.ask_price_1 >= self.enpp + self.atr * self.s2: # loss
+                self.cover(tick.ask_price_1, self.volume)
                 self.mp = 0
         self.put_event()
 
@@ -126,7 +133,7 @@ class BreakStrategy(CtaTemplate):
         """
         Callback of new bar data update.
         """
-        self.bg.on_bar(bar)
+        self.bg.update_bar(bar)
         self.am_1m.update_bar(bar)
         if not self.am_1m.inited:
             return

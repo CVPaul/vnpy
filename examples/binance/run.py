@@ -8,6 +8,7 @@ from vnpy.trader.engine import MainEngine
 from vnpy.trader.ui import MainWindow, create_qapp
 from vnpy.gateway.binance import Spot, CoinM, USDTM, UnifyCM
 
+from vnpy.cta.strategy.base import EVENT_CTA_LOG
 from vnpy.cta.strategy import CtaStrategyApp
 from vnpy.cta.backtest import CtaBacktesterApp
 from vnpy.data.recorder import DataRecorderApp
@@ -30,6 +31,10 @@ def main():
     main_engine.add_app(DataRecorderApp)
     main_engine.add_app(CtaBacktesterApp)
     main_engine.add_app(PortfolioStrategyApp)
+    # add log event
+    log_engine = main_engine.get_engine("log")
+    event_engine.register(
+            EVENT_CTA_LOG, log_engine.process_log_event)
     # main window setting
     main_window = MainWindow(main_engine, event_engine)
     main_window.showMaximized()
