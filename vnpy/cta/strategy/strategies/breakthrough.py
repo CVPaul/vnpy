@@ -39,17 +39,20 @@ class BreakStrategy(CtaTemplate):
     ]
 
     variables = [
+        "ma",
         "upp",
         "dnn",
         "atr",
-        "ma",
+        "hpp",
+        "lpp",
+        "enpp"
     ]
 
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
         """"""
         super().__init__(cta_engine, strategy_name, vt_symbol, setting)
 
-        self.stopped = False
+        self.stopped = True
         self.last_order_time = 0
         self.atr = 0.0
         self.upp = 0.0
@@ -67,7 +70,6 @@ class BreakStrategy(CtaTemplate):
         """
         Callback when strategy is inited.
         """
-        self.stopped = False
         self.load_bar(10)
         self.write_log("策略初始化")
 
@@ -75,6 +77,7 @@ class BreakStrategy(CtaTemplate):
         """
         Callback when strategy is started.
         """
+        self.stopped = False
         self.write_log("策略启动")
 
     def on_stop(self):
@@ -103,10 +106,12 @@ class BreakStrategy(CtaTemplate):
                 self.buy(tick.ask_price_1, self.volume)
                 # print('buy', self.atr, tick.ask_price_1, self.volume)
                 self.mp = 1
+                self.enpp = self.hpp = self.lpp = tick.ask_price_1
             elif tick.bid_price_1 <= self.ma - self.atr * self.k1:
                 self.short(tick.bid_price_1, self.volume)
                 # print('short', self.atr, self.k1, self.s1, tick.bid_price_1, self.volume)
                 self.mp = -1
+                self.enpp = self.hpp = self.lpp = tick.bid_price_1
         elif self.mp > 0:
             # if tick.bid_price_1 <= self.enpp - self.atr * self.s2: # loss
             #     self.sell(tick.bid_price_1, self.mp)
@@ -158,7 +163,6 @@ class BreakStrategy(CtaTemplate):
         """
         Callback of new trade data update.
         """
-        self.enpp = self.hpp = self.lpp = trade.price
         self.put_event()
 
     def on_stop_order(self, stop_order: StopOrder):

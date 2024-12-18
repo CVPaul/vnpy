@@ -1250,7 +1250,7 @@ class BinanceUnifyCMRestApi(RestClient):
         """Send new order"""
         # Generate new order id
         self.order_count += 1
-        orderid: str = f'{req.reference}_{self.order_prefix}_{self.order_count}'
+        orderid: str = f'{req.reference.split("_")[-1]}_{self.order_prefix}_{self.order_count}'
 
         # Push a submitting order event
         order: OrderData = req.create_order_data(
@@ -1481,7 +1481,7 @@ class BinanceUnifyCMRestApi(RestClient):
         order.status = Status.REJECTED
         self.gateway.on_order(order)
 
-        msg: str = f"Send order failed, status code: {status_code}, message: {request.response.text}"
+        msg: str = f"Send order failed, status code: {status_code}, message: {request.response.text}, orderid: {order.orderid}"
         self.gateway.write_log(msg)
 
     def on_send_order_error(self, exception_type: type, exception_value: Exception, tb, request: Request) -> None:
