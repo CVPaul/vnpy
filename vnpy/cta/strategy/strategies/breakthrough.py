@@ -93,7 +93,7 @@ class BreakStrategy(CtaTemplate):
         """
         self.bg.update_tick(tick)
         self.hpp = max(self.hpp, tick.ask_price_1)
-        self.lpp = max(self.lpp, tick.bid_price_1)
+        self.lpp = min(self.lpp, tick.bid_price_1)
         if self.atr <= 0:
             return
         if not(self.am_1m.inited and self.am_8h.inited):
