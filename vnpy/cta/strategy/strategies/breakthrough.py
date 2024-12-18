@@ -144,6 +144,7 @@ class BreakStrategy(CtaTemplate):
             return
         self.hpp = self.am_1m.high[-1]
         self.dnn = self.am_1m.low[-1]
+        self.ma = self.am_1m.ema(self.his_window)
         self.put_event()
     
     def on_8h_bar(self, bar: BarData):
@@ -151,7 +152,6 @@ class BreakStrategy(CtaTemplate):
         if not self.am_8h.inited:
             return
         self.atr = self.am_8h.atr(self.atr_window)
-        self.ma = self.am_8h.sma(self.atr_window)
 
     def on_order(self, order: OrderData):
         """

@@ -1,5 +1,6 @@
 import traceback
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 
 from collections import defaultdict
@@ -290,6 +291,17 @@ class BacktestingEngine:
         # self.output(_("逐日盯市盈亏计算完成"))
         return self.daily_df
 
+    def trade_extra(self, trades: List[TradeData]):
+        l_cnt, s_cnt = 0, 0
+        for trade in trades:
+            if trade.offset == Offset.OPEN:
+                if trade.direction == Direction.LONG:
+                    l_cnt += 1
+                elif trade.direction == Direction.SHORT:
+                    s_cnt += 1
+        return {'long_cnt': l_cnt, 'short_cnt':s_cnt}
+
+
     def calculate_statistics(self, df: DataFrame = None, output=True) -> dict:
         """"""
         # self.output(_("开始计算策略统计指标"))
@@ -297,7 +309,9 @@ class BacktestingEngine:
         # Check DataFrame input exterior
         if df is None:
             df: DataFrame = self.daily_df
-
+            res = pd.DataFrame(df['trades'].apply(self.trade_extra).tolist())
+            for key in res:
+                df[key] = res[key].values
         # Init all statistics default value
         start_date: str = ""
         end_date: str = ""
@@ -384,6 +398,8 @@ class BacktestingEngine:
 
             total_trade_count: int = df["trade_count"].sum()
             daily_trade_count: int = total_trade_count / total_days
+            total_long_count: int = df["long_cnt"].sum()
+            total_short_count: int = df["short_cnt"].sum()
 
             total_return: float = (end_balance / self.capital - 1) * 100
             annual_return: float = total_return / total_days * self.annual_days
@@ -431,6 +447,8 @@ class BacktestingEngine:
             self.output(_("总滑点：\t{:,.2f}").format(total_slippage))
             self.output(_("总成交金额：\t{:,.2f}").format(total_turnover))
             self.output(_("总成交笔数：\t{}").format(total_trade_count))
+            self.output(_("总做多笔数：\t{}").format(total_long_count))
+            self.output(_("总做空笔数：\t{}").format(total_short_count))
 
             self.output(_("日均盈亏：\t{:,.2f}").format(daily_net_pnl))
             self.output(_("日均手续费：\t{:,.2f}").format(daily_commission))
