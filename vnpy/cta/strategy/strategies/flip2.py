@@ -26,7 +26,6 @@ class Flip2Strategy(CtaTemplate):
     atr_window = 20
     his_window = 30
 
-
     parameters = [
         # "freq",
         "atr_window",
@@ -62,6 +61,7 @@ class Flip2Strategy(CtaTemplate):
         self.lpp = 0.0
         self.enpp = 0.0
 
+        self.next_open = -1.0
         self.bg = BarGenerator(self.on_bar, 8, self.on_8h_bar, Interval.HOUR)
         self.am_8h = ArrayManager(self.atr_window + 1)
         self.am_1m = ArrayManager(self.his_window + 1)
@@ -87,42 +87,36 @@ class Flip2Strategy(CtaTemplate):
         self.stopped = True
         self.write_log("策略停止")
 
+    @property
+    def long_loss_price(self):
+        return self.enpp - self.atr * self.s1
+
+    @property
+    def long_profit_price(self):
+        return self.enpp + self.atr * self.s2
+
+    @property
+    def short_loss_price(self):
+        return self.enpp + self.atr * self.s1
+
+    @property
+    def short_profit_price(self):
+        return self.enpp - self.atr * self.s2
+
     def on_tick(self, tick: TickData):
         """
         Callback of new tick data update.
         """
         self.bg.update_tick(tick)
+        self.next_open = tick.last_price
         self.hpp = max(self.hpp, tick.ask_price_1)
         self.lpp = min(self.lpp, tick.bid_price_1)
-        if self.atr <= 0:
-            return
-        if not(self.am_1m.inited and self.am_8h.inited):
-            return
-        if self.stopped:
-            return 
         # self.cancel_all()
-        if self.mp == 0:
-            if tick.ask_price_1 >= self.dnn + self.atr * self.k1: # long
-                self.buy(tick.ask_price_1, self.volume)
-                self.mp = 1
-                self.enpp = self.hpp = self.lpp = tick.ask_price_1
-            elif tick.bid_price_1 <= self.upp - self.atr * self.k1: # short
-                self.short(tick.bid_price_1, self.volume)
-                self.mp = -1
-                self.enpp = self.hpp = self.lpp = tick.bid_price_1
-        elif self.mp > 0:
-            if tick.ask_price_1 >= self.enpp + self.atr * self.s1: # profit
-                self.sell(tick.ask_price_1, self.volume)
+        if self.mp > 0:
+            if tick.last_price >= self.long_profit_price or tick.last_price <= self.long_loss_price:
                 self.mp = 0
-            if tick.bid_price_1 <= self.enpp - self.atr * self.s2: # loss
-                self.sell(tick.bid_price_1, self.volume)
-                self.mp = 0
-        else:
-            if tick.bid_price_1 <= self.enpp - self.atr * self.s1: # profit
-                self.cover(tick.bid_price_1, self.volume)
-                self.mp = 0
-            if tick.ask_price_1 >= self.enpp + self.atr * self.s2: # loss
-                self.cover(tick.ask_price_1, self.volume)
+        if self.mp < 0:
+            if tick.last_price <= self.long_profit_price or tick.last_price >= self.long_loss_price:
                 self.mp = 0
         self.put_event()
 
@@ -132,11 +126,31 @@ class Flip2Strategy(CtaTemplate):
         """
         self.bg.update_bar(bar)
         self.am_1m.update_bar(bar)
-        if not self.am_1m.inited:
+        if not (self.am_1m.inited and self.am_8h.inited):
             return
+        # next_open实盘是可以获取的，但是离线订单匹配的时候是cross机制，所以一定会match，实盘不一定抢得到
+        # 但是这是符合预取的Key Point（by @xqli）
+        next_open = self.next_open if self.next_open > 0 else bar.next_open
         self.upp = max(self.am_1m.high)
         self.dnn = min(self.am_1m.low)
-        self.ma = self.am_1m.ema(self.his_window)
+        # trade logical
+        if self.stopped or self.atr <= 0:
+            return
+        if self.mp == 0:
+            if self.upp - next_open > self.atr * self.k1: # long
+                self.buy(next_open, self.volume)
+                self.mp = 1
+                self.enpp = self.hpp = self.lpp = next_open
+                self.sell(self.long_loss_price, self.volume, stop=True) # loss
+                self.sell(self.long_profit_price, self.volume) # profit
+                self.write_log(f"buy:({self.enpp=},{self.long_loss_price=},{self.long_profit_price=},{self.volume=})")
+            elif next_open - self.dnn > self.atr * self.k1: # short
+                self.short(next_open, self.volume)
+                self.mp = -1
+                self.enpp = self.hpp = self.lpp = next_open
+                self.cover(self.short_loss_price, self.volume, stop=True) # loss
+                self.cover(self.short_profit_price, self.volume) # profit
+                self.write_log(f"sell:({self.enpp=},{self.long_loss_price=},{self.long_profit_price=},{self.volume=})")
         self.put_event()
     
     def on_8h_bar(self, bar: BarData):
@@ -155,6 +169,9 @@ class Flip2Strategy(CtaTemplate):
         """
         Callback of new trade data update.
         """
+        if Offset.CLOSE: # close
+            self.mp = 0
+        self.write_log(f"trade:{self.__class__},{trade.price=},{trade.volume=},{trade.direction=},{trade.offset},{trade.orderid}")
         self.put_event()
 
     def on_stop_order(self, stop_order: StopOrder):

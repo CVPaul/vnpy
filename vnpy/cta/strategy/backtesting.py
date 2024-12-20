@@ -219,6 +219,9 @@ class BacktestingEngine:
         """"""
         if self.mode == BacktestingMode.BAR:
             func = self.new_bar
+            for i in range(len(self.history_data) - 1):
+                self.history_data[i].next_open = self.history_data[i+1].open_price
+            self.history_data[i].next_open = self.history_data.close_price
         else:
             func = self.new_tick
 
@@ -243,7 +246,7 @@ class BacktestingEngine:
                     self.output(traceback.format_exc())
                     return
 
-            progress = min(ix / 10, 1)
+            #progress = min(ix / 10, 1)
             #progress_bar: str = "=" * (ix + 1)
             #self.output(_("回放进度：{} [{:.0%}]").format(progress_bar, progress))
 
