@@ -221,7 +221,7 @@ class BacktestingEngine:
             func = self.new_bar
             for i in range(len(self.history_data) - 1):
                 self.history_data[i].next_open = self.history_data[i+1].open_price
-            self.history_data[i].next_open = self.history_data.close_price
+            self.history_data[i+1].next_open = self.history_data[i+1].close_price
         else:
             func = self.new_tick
 
