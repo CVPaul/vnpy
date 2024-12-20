@@ -16,7 +16,7 @@ from vnpy.cta.strategy import (
 class TakeFlashPinStrategy(CtaTemplate):
     """"""
 
-    author = "T0"
+    author = "Leurez"
 
     volume = 1
     period = 30
@@ -34,16 +34,13 @@ class TakeFlashPinStrategy(CtaTemplate):
     ]
 
     variables = [
-        # "atr",
-        # "upp",
-        # "dnn"
     ]
 
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
         """"""
         super().__init__(cta_engine, strategy_name, vt_symbol, setting)
 
-        self.stopped = False
+        self.stopped = True
         self.last_order_time = 0
 
         self.bg = BarGenerator(self.on_bar)
@@ -53,13 +50,14 @@ class TakeFlashPinStrategy(CtaTemplate):
         """
         Callback when strategy is inited.
         """
-        self.stopped = False
+        self.load_bar(1)
         self.write_log("策略初始化")
 
     def on_start(self):
         """
         Callback when strategy is started.
         """
+        self.stopped = False
         self.write_log("策略启动")
 
     def on_stop(self):
@@ -73,9 +71,9 @@ class TakeFlashPinStrategy(CtaTemplate):
         """
         Callback of new tick data update.
         """
-        # self.bg.update_tick(tick)
-        # if self.hm.inited and self.am.inited:
-        #     return
+        self.bg.update_tick(tick)
+        if not self.am.inited:
+            return
         self.hpp = max(self.hpp, tick.last_price)
         if self.stopped:
             return
@@ -96,7 +94,7 @@ class TakeFlashPinStrategy(CtaTemplate):
         am.update_bar(bar)
         if not am.inited:
             return
-        self.hpp = am.high[-1]
+        self.hpp = max(am.high)
         self.put_event()
 
     def on_order(self, order: OrderData):

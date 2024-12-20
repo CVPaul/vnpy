@@ -13,7 +13,7 @@ from vnpy.cta.strategy import (
 )
 
 
-class FlipStrategy(CtaTemplate):
+class Flip2Strategy(CtaTemplate):
     """"""
 
     author = "Leurez"
@@ -39,6 +39,7 @@ class FlipStrategy(CtaTemplate):
     ]
 
     variables = [
+        "ma",
         "upp",
         "dnn",
         "atr",
@@ -56,13 +57,14 @@ class FlipStrategy(CtaTemplate):
         self.atr = 0.0
         self.upp = 0.0
         self.dnn = 0.0
+        self.ma = 0.0
         self.hpp = 0.0
         self.lpp = 0.0
         self.enpp = 0.0
 
         self.bg = BarGenerator(self.on_bar, 8, self.on_8h_bar, Interval.HOUR)
         self.am_8h = ArrayManager(self.atr_window + 1)
-        # self.am_1m = ArrayManager(self.his_window + 1)
+        self.am_1m = ArrayManager(self.his_window + 1)
     
     def on_init(self):
         """
@@ -94,8 +96,7 @@ class FlipStrategy(CtaTemplate):
         self.lpp = min(self.lpp, tick.bid_price_1)
         if self.atr <= 0:
             return
-        # if not(self.am_1m.inited and self.am_8h.inited):
-        if not self.am_8h.inited:
+        if not(self.am_1m.inited and self.am_8h.inited):
             return
         if self.stopped:
             return 
@@ -130,11 +131,12 @@ class FlipStrategy(CtaTemplate):
         Callback of new bar data update.
         """
         self.bg.update_bar(bar)
-        # self.am_1m.update_bar(bar)
-        # if not self.am_1m.inited:
-        #     return
-        self.upp = bar.high_price # self.am_1m.high[-1]
-        self.dnn = bar.low_price # self.am_1m.low[-1]
+        self.am_1m.update_bar(bar)
+        if not self.am_1m.inited:
+            return
+        self.upp = max(self.am_1m.high)
+        self.dnn = min(self.am_1m.low)
+        self.ma = self.am_1m.ema(self.his_window)
         self.put_event()
     
     def on_8h_bar(self, bar: BarData):
