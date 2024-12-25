@@ -138,7 +138,7 @@ class Flip2Strategy(CtaTemplate):
             return
         next_open = self.next_open if self.next_open > 0 else bar.next_open
         if self.mp == 0:
-            if self.upp - next_open > self.atr * self.k1: # long
+            if next_open - self.dnn > self.atr * self.k1: # short
                 self.buy(next_open, self.volume)
                 self.mp = 1
                 self.enpp = self.hpp = self.lpp = next_open
@@ -147,7 +147,7 @@ class Flip2Strategy(CtaTemplate):
                 self.order_pair[loss_id] = prof_id
                 self.order_pair[prof_id] = loss_id
                 self.write_log(f"buy:({self.enpp=},{self.long_loss_price=},{self.long_profit_price=},{self.volume=})")
-            elif next_open - self.dnn > self.atr * self.k1: # short
+            elif self.upp - next_open > self.atr * self.k1: # long
                 self.short(next_open, self.volume)
                 self.mp = -1
                 self.enpp = self.hpp = self.lpp = next_open
