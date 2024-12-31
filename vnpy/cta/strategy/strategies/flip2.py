@@ -60,11 +60,12 @@ class Flip2Strategy(CtaTemplate):
         self.hpp = 0.0
         self.lpp = 0.0
         self.enpp = 0.0
+        self.count = 0
 
         self.next_open = -1.0
         self.bg = BarGenerator(self.on_bar, 8, self.on_8h_bar, Interval.HOUR)
         self.am_8h = ArrayManager(self.atr_window + 1)
-        self.am_1m = ArrayManager(self.his_window + 1)
+        self.am_1m = ArrayManager(self.his_window)
         self.order_pair = {}
     
     def on_init(self):
@@ -109,15 +110,43 @@ class Flip2Strategy(CtaTemplate):
         Callback of new tick data update.
         """
         self.bg.update_tick(tick)
-        self.next_open = tick.last_price
-        self.hpp = max(self.hpp, tick.ask_price_1)
-        self.lpp = min(self.lpp, tick.bid_price_1)
+        # trade logical
+        if self.stopped:
+            return
+        if not (self.am_8h.inited and self.am_1m.inited):
+            return
         # self.cancel_all()
-        if self.mp > 0:
-            if tick.last_price >= self.long_profit_price or tick.last_price <= self.long_loss_price:
+        # open
+        cond_s = self.upp - tick.bid_price_1 > self.k1 * self.atr
+        cond_l = tick.ask_price_1 - self.dnn > self.k1 * self.atr
+        if self.mp == 0 and cond_l:
+            self.write_log(f'long-open,{self.atr},{self.upp},{self.dnn},{tick.bid_price_1}')
+            self.buy(tick.bid_price_1, self.volume)
+            self.enpp = tick.bid_price_1
+            self.mp = 1
+        if self.mp == 0 and cond_s:
+            self.write_log(f'short-open,{self.atr},{self.upp},{self.dnn},{tick.ask_price_1}')
+            self.short(tick.ask_price_1, self.volume)
+            self.enpp = tick.ask_price_1
+            self.mp = -1
+        # close
+        if self.mp > 0 and not cond_l:
+            if tick.bid_price_1 < self.long_loss_price:
+                self.write_log(f'long-win,{self.atr},{self.upp},{self.dnn},{tick.bid_price_1}')
+                self.sell(tick.bid_price_1, self.volume)
                 self.mp = 0
-        if self.mp < 0:
-            if tick.last_price <= self.long_profit_price or tick.last_price >= self.long_loss_price:
+            elif tick.ask_price_1 > self.long_profit_price:
+                self.write_log(f'long-win,{self.atr},{self.upp},{self.dnn},{tick.ask_price_1}')
+                self.sell(tick.ask_price_1, self.volume)
+                self.mp = 0
+        if self.mp < 0 and not cond_s:
+            if tick.ask_price_1 > self.short_loss_price:
+                self.write_log(f'short-loss,{self.atr},{self.upp},{self.dnn},{tick.ask_price_1}')
+                self.cover(tick.ask_price_1, self.volume)
+                self.mp = 0
+            elif tick.bid_price_1 < self.short_profit_price:
+                self.write_log(f'short-win,{self.atr},{self.upp},{self.dnn},{tick.bid_price_1}')
+                self.cover(tick.bid_price_1, self.volume)
                 self.mp = 0
         self.put_event()
 
@@ -127,35 +156,11 @@ class Flip2Strategy(CtaTemplate):
         """
         self.bg.update_bar(bar)
         self.am_1m.update_bar(bar)
-        if not (self.am_1m.inited and self.am_8h.inited):
+        if not self.am_1m.inited:
             return
-        # next_open实盘是可以获取的，但是离线订单匹配的时候是cross机制，所以一定会match，实盘不一定抢得到
         # 但是这是符合预取的Key Point（by @xqli）
-        self.upp = max(self.am_1m.high)
-        self.dnn = min(self.am_1m.low)
-        # trade logical
-        if self.stopped or self.atr <= 0:
-            return
-        next_open = self.next_open if self.next_open > 0 else bar.next_open
-        if self.mp == 0:
-            if next_open - self.dnn > self.atr * self.k1: # short
-                self.buy(next_open, self.volume)
-                self.mp = 1
-                self.enpp = self.hpp = self.lpp = next_open
-                loss_id = self.sell(self.long_loss_price, self.volume, stop=True)[0] # loss
-                prof_id = self.sell(self.long_profit_price, self.volume)[0] # profit
-                self.order_pair[loss_id] = prof_id
-                self.order_pair[prof_id] = loss_id
-                self.write_log(f"buy:({self.enpp=},{self.long_loss_price=},{self.long_profit_price=},{self.volume=})")
-            elif self.upp - next_open > self.atr * self.k1: # long
-                self.short(next_open, self.volume)
-                self.mp = -1
-                self.enpp = self.hpp = self.lpp = next_open
-                loss_id = self.cover(self.short_loss_price, self.volume, stop=True)[0] # loss
-                prof_id = self.cover(self.short_profit_price, self.volume)[0] # profit
-                self.order_pair[loss_id] = prof_id
-                self.order_pair[prof_id] = loss_id
-                self.write_log(f"sell:({self.enpp=},{self.long_loss_price=},{self.long_profit_price=},{self.volume=})")
+        self.upp = np.mean(self.am_1m.high)
+        self.dnn = np.mean(self.am_1m.low)
         self.put_event()
     
     def on_8h_bar(self, bar: BarData):
@@ -174,29 +179,10 @@ class Flip2Strategy(CtaTemplate):
         """
         Callback of new trade data update.
         """
-        if self.next_open <= 0 and trade.offset == Offset.CLOSE: # close
-            if trade.vt_orderid in self.order_pair:
-                cid = self.order_pair[trade.vt_orderid]
-                self.cancel_order(cid)
-                del self.order_pair[cid]
-                del self.order_pair[trade.vt_orderid]
-                # self.write_log(f"cancel: order pair=(trade={trade.vt_orderid}, cancel={cid})")
-            self.mp = 0
-        self.write_log(f"trade:{self.__class__.__name__},{trade.price=},{trade.volume=},{trade.direction=},{trade.offset},{trade.orderid}")
         self.put_event()
 
     def on_stop_order(self, stop_order: StopOrder):
         """
         Callback of stop order update.
         """
-        if self.next_open <= 0 and stop_order.offset == Offset.CLOSE: # close
-            if stop_order.vt_orderids:
-                vt_orderid = stop_order.stop_orderid
-                if vt_orderid in self.order_pair:
-                    cid = self.order_pair[vt_orderid]
-                    self.cancel_order(cid)
-                    del self.order_pair[cid]
-                    del self.order_pair[vt_orderid]
-                    # self.write_log(f"cancel: order pair=(trade={vt_orderid}, cancel={cid})")
-            self.mp = 0
         self.put_event()

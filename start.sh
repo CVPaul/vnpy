@@ -13,7 +13,7 @@ cat ${port}.PID|xargs kill
 # sudo apt install libgl1 libegl1 websockify libxkbcommon0
 # sudo bash install.sh
 # bash install.sh
-LANG=zh_CN.UTF8 QT_QPA_PLATFORM="vnc:port=${port}" python examples/binance/run.py &
+LANG=zh_CN.UTF8 QT_QPA_PLATFORM="vnc:port=${port}" python examples/binance/run.py >> ${port}.log 2>&1 &
 echo $! > ${port}.PID
 # cd noVNC && ./utils/novnc_proxy --vnc localhost:5900
 

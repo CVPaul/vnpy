@@ -5,6 +5,7 @@
 *.txt
 *.pid
 *.PID
+*.log
 *.egg-info/
 
 # Jupyter
